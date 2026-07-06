@@ -2,8 +2,10 @@
 A simple Python Langchain application to learn.
 
 ### TODO
-- Create Tool with params
+- Use streams instead of POST
 - Introduce memory
+- Use multiple agents and an orchestrator
+- Agent Harness?
 - Switch to AWS Bedrock
 
 ### Run project
