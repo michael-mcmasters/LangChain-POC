@@ -1,4 +1,4 @@
-"""The web layer: the FastAPI app and its routes."""
+"""Controller - Uses FastAPI and Uvicorn (both are needed)"""
 
 from fastapi import FastAPI
 

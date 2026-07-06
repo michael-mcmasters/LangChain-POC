@@ -18,9 +18,8 @@ logger = logging.getLogger(__name__)
 model = ChatAnthropic(model=config.MODEL_NAME, max_tokens=1024)
 
 
-# A tool is just a Python function the model can choose to call. The @tool
-# decorator turns it into something the agent understands. The docstring is
-# NOT a comment — the model reads it to decide when this tool is useful.
+# @tool means the Agent can call this
+# The docstring tells the agent whent o use it - It's not a comment for humans
 @tool
 def get_current_time() -> str:
     """Return the current date and time. Use this whenever the user asks what
@@ -29,9 +28,16 @@ def get_current_time() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-# create_agent builds the loop: send the message + tool list to the model,
-# run any tool the model asks for, feed the result back, repeat until it answers.
-agent = create_agent(model, tools=[get_current_time])
+# Creates agent, tools it can use, and its system prtomp
+# Agent will go through tools to get a response before returning the result
+agent = create_agent(
+    model,
+    tools=[get_current_time],
+    # Not a bad idea to re-emphasize tools in the system prompt so the agent doesn't ignore them
+    system_prompt="""You are a helpful, friendly assistant. Keep your answers concise —
+one or two sentences unless the user asks for more detail. When the user asks about the
+current date or time, use the get_current_time tool instead of guessing.""",
+)
 
 
 def ask(message: str) -> str:
