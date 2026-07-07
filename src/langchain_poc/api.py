@@ -19,4 +19,7 @@ async def chat_stream(req: ChatRequest):
     # media_type="text/plain" keeps this simple to read and test. The common
     # production pattern is Server-Sent Events ("text/event-stream"), where each
     # chunk is framed as "data: <token>\n\n".
-    return StreamingResponse(agent.stream_ask(req.message), media_type="text/plain")
+    return StreamingResponse(
+        agent.stream_ask(req.message, req.thread_id),
+        media_type="text/plain"
+    )

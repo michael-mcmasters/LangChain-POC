@@ -4,4 +4,5 @@ from pydantic import BaseModel
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str                    # User Message
+    thread_id: str                  # ID for the conversation - Used by LangChain to remember conversation history / updates

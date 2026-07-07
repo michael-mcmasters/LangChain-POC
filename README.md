@@ -16,12 +16,12 @@ Go to http://localhost:8000/ to and you should see {"Hello":"World"}
 
 Get Time
 ```ps
-curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is the current time?"}'
+curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is the current time?", "thread_id": "ABC"}'
 ```
 
 Use Math (Notice the LLLM calls 2 tools - Multiply and then Add)
 ```ps
-curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?"}'
+curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?, "thread_id": "ABC""}'
 ```
 
 ### Logs
@@ -68,13 +68,28 @@ APIs prompts are charged separately from your Anthropic account (even though it'
 I pre-paid $5. Once credit runs out requests will fail.
 Long-term, want to provision AWS Bedrock which also has Opus, along with cheaper models for testing.
 
-### Things to know for future projects (what I've learned)
 
-### Things I've learned - What I want to remember next time
-
-### Things I've learned
-Lanchain: Provides abstractions such as @tool
-LangGraph: The actual agents doing the work. The ReAct model (Reason + Act) which is calling a Tool, then calling the LLM, then calling another Tool.
+### For Future Projects - (Things I've Learned)
+- Lanchain: Provides abstractions such as @tool
+- LangGraph: The actual agents doing the work. The ReAct model (Reason + Act) which is calling a Tool, then calling the LLM, then calling another Tool.
+- Checkpointer: Enables the server to "remember" the existing conversation... Client passes a thread_id. Server (this) stores conversation and updates in a map the thread_id points to. When the client makes a 2nd request, it passes the thread_id, and the server remembers the full conversation history and context.
+  - If you restart the app, this state is gone. To persist, you can save to a database.
+  - In a real scenario, you should validate the thread_id so that bad actor can't mock it
+  - Setting my name with thread_id ABC
+    ```
+    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "My name is Michael. Please remember it.", "thread_id": "ABC"}'
+    Got it, **Michael**! I'll remember your name throughout our conversation. How can I help you today?
+    ```
+  - Asking my name with thread_id ABC
+    ```
+    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is my name?", "thread_id": "ABC"}'
+    Your name is **Michael**! 😊 Is there anything else I can help you with?
+    ```
+  - Asking my name with no thread_id
+    ```
+    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is my name?"}'
+    I don't have access to any personal information about you, so I don't know your name. You're welcome to tell me, and I'll use it in our conversation! 😊
+    ```
 
 For Tools, the docstring inside the function is for the agent to know when to run them. It's not 100% for humans.
 
