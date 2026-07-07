@@ -39,14 +39,75 @@ def ask(message: str) -> str:
     # Walk the whole conversation the agent produced and log each step so you can
     # see the loop: user turn -> model asks for a tool -> tool result -> answer.
     for m in result["messages"]:
-        kind = m.__class__.__name__  # HumanMessage / AIMessage / ToolMessage
-        tool_calls = getattr(m, "tool_calls", None)
-        if tool_calls:
-            for call in tool_calls:
-                logger.info(f"  {kind} -> calling tool {call['name']}({call['args']})")
-        elif m.content:
-            logger.info(f"  {kind}: {m.content}")
+        _log_step(m)
 
     reply = result["messages"][-1].content
     logger.info(f"FINAL reply: {reply}")
     return reply
+
+
+async def stream_ask(message: str):
+    """Run the agent and yield the reply text token-by-token as it's produced.
+
+        ReAct loop (Reason + Act)
+            - Agent calls model -> runs tool -> calls model again
+            - In more complex scenarios, orchestrates to other agents
+
+        We ask for stream_mode updates and messages
+            TLDR: messages are the tokenized response. updates are, well, updates (LLM call, Tool response, complete (non-tokenized) AI message)
+
+        See README for more
+    """
+    logger.info(f"USER asked (stream): {message}")
+
+    parts = []  # Collect the streamed tokens so we can log the full reply at the end
+    async for mode, payload in agent.astream(
+        {"messages": [("user", message)]},
+        stream_mode=["updates", "messages"],
+    ):
+        if mode == "messages":
+            # Stream returned a chunk of a message. Return it to the user
+            chunk, _metadata = payload
+            text = _chunk_text(chunk)
+            if text:
+                parts.append(text)
+                yield text
+        elif mode == "updates":
+            # Stream returned an AIMessage or ToolMessage. Log it so we have updates and continue.
+            # See README for more on these)
+            for node_update in payload.values():
+                if isinstance(node_update, dict):
+                    for m in node_update.get("messages", []):
+                        _log_step(m)
+
+    logger.info(f"FINAL reply: {''.join(parts)}")
+
+
+def _chunk_text(chunk) -> str:
+    """Pull the plain text out of a streamed message chunk.
+
+    Anthropic sometimes hands back content as a simple string, and sometimes as a
+    list of "content blocks" (dicts like {"type": "text", "text": "..."}). This
+    normalizes both so callers always get a string (empty string for non-text
+    chunks, e.g. the ones that carry tool-call arguments)."""
+    content = chunk.content
+    if isinstance(content, str):
+        return content
+    return "".join(
+        block.get("text", "")
+        for block in content
+        if isinstance(block, dict) and block.get("type") == "text"
+    )
+
+
+def _log_step(m) -> None:
+    """Log a single message from the agent's run: a user turn, the model asking
+    for a tool, a tool result, or the final answer. Shared by both endpoints so
+    their logs look the same."""
+    kind = m.__class__.__name__  # Reads class name - HumanMessage / AIMessage / ToolMessage / SystemMessage / ChatMessage / REmoveMessage / BaseMessage
+    tool_calls = getattr(m, "tool_calls", None)
+    if tool_calls:
+        for call in tool_calls:
+            logger.info(f"  {kind} -> calling tool {call['name']}({call['args']})")
+    elif m.content:
+        logger.info(f"  {kind}: {_chunk_text(m)}")
