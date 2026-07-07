@@ -2,7 +2,6 @@
 A simple Python Langchain application to learn.
 
 ### TODO
-- Introduce memory
 - Use multiple agents and an orchestrator
 - Agent Harness?
 - Switch to AWS Bedrock
