@@ -4,6 +4,7 @@ import logging
 
 from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 # Importing config here guarantees load_dotenv() has run before we build the
@@ -67,33 +68,16 @@ async def stream_ask(message: str, thread_id: str):
                 parts.append(text)
                 yield {"type": "token", "content": text}
         elif mode == "updates":
-            # Stream returned an AIMessage, ToolMessage, or something lese
-            # See README for more on these)
+            # A completed step (an AIMessage, ToolMessage, etc). Turn it into
+            # events, then LOG and YIELD the very same dict — so the server log and
+            # the client stream can never disagree about what happened.
+            # See README for more on these.
             for node_update in payload.values():
                 if isinstance(node_update, dict):
                     for m in node_update.get("messages", []):
-                        # Log it so we have updates and continue.
-                        _log_step(m)
-
-                        # Updates the event stream response - We set our own event name (tool_call, tool_message, etc) and any additional values (name, args, etc)
-                        # Client checks the type and decides how/if it wants to handle it... For example type is "tool_message", it could show the user the result of the tool
-                        
-                        # tool_call
-                        tool_calls = getattr(m, "tool_calls", None)
-                        if tool_calls:
-                            for call in tool_calls:
-                                yield {
-                                    "type": "tool_call",
-                                    "name": call["name"],
-                                    "args": call["args"],
-                                }
-                        # tool_message (response from the tool / function)
-                        elif getattr(m, "type", None) == "tool":  # a ToolMessage
-                            yield {
-                                "type": "tool_message",
-                                "name": m.name,
-                                "content": _chunk_text(m),
-                            }
+                        for event in _message_events(m):
+                            logger.info(f"  event -> {event}")  # same dict the client gets
+                            yield event
 
     logger.info(f"FINAL reply: {''.join(parts)}")
 
@@ -115,14 +99,23 @@ def _chunk_text(chunk) -> str:
     )
 
 
-def _log_step(m) -> None:
-    """Log a single message from the agent's run: a user turn, the model asking
-    for a tool, a tool result, or the final answer. Shared by both endpoints so
-    their logs look the same."""
-    kind = m.__class__.__name__  # The class name - HumanMessage / AIMessage / ToolMessage / SystemMessage / ChatMessage / REmoveMessage / BaseMessage
-    tool_calls = getattr(m, "tool_calls", None)
-    if tool_calls:
-        for call in tool_calls:
-            logger.info(f"  {kind} -> calling tool {call['name']}({call['args']})")
-    elif m.content:
-        logger.info(f"  {kind}: {_chunk_text(m)}")
+def _message_events(m):
+    """Classify one agent message into the events we surface (a generator).
+
+    Single source of truth: the stream loop LOGS and YIELDS whatever this yields,
+    so the server logs and the client stream always agree. We switch on the
+    message class with isinstance (which also matches subclasses):
+
+      - AIMessage with tool_calls -> one "tool_call" event per requested tool.
+        (An AIMessage can be plain text OR carry tool requests, so the class check
+        alone isn't enough — we also check tool_calls.)
+      - ToolMessage             -> one "tool_message" event with the result.
+
+    Other messages (plain AI answer text, the user's turn, ...) produce nothing
+    here: the answer streams as "token" events, and the full reply is logged
+    separately at the end."""
+    if isinstance(m, AIMessage) and m.tool_calls:
+        for call in m.tool_calls:
+            yield {"type": "tool_call", "name": call["name"], "args": call["args"]}
+    elif isinstance(m, ToolMessage):
+        yield {"type": "tool_message", "name": m.name, "content": _chunk_text(m)}
