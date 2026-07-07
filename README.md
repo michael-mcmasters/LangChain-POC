@@ -12,7 +12,9 @@ uv run uvicorn langchain_poc.api:app --reload
 Go to http://localhost:8000/ to and you should see {"Hello":"World"}
 
 ### Invoke
-(Commands are on Windows - Use pwsh (not powershell) for syntax to work.)
+Things to know
+- Example commands are on Windows pwsh (not powershell) - If they don't work enter `pwsh` first to use Powershell 7+
+- thread_id is your conversation history. To "start a new chat" change it to another value.
 
 Get Time
 ```ps
@@ -21,7 +23,7 @@ curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: applic
 
 Use Math (Notice the LLLM calls 2 tools - Multiply and then Add)
 ```ps
-curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?, "thread_id": "ABC""}'
+curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC""}'
 ```
 
 ### Logs
