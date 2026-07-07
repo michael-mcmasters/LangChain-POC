@@ -75,8 +75,9 @@ async def stream_ask(message: str, thread_id: str):
             for node_update in payload.values():
                 if isinstance(node_update, dict):
                     for m in node_update.get("messages", []):
+                        # _message_events both LOGS each message and YIELDS any
+                        # client events for it — one place, so they stay in sync.
                         for event in _message_events(m):
-                            logger.info(f"  event -> {event}")  # same dict the client gets
                             yield event
 
     logger.info(f"FINAL reply: {''.join(parts)}")
@@ -100,22 +101,30 @@ def _chunk_text(chunk) -> str:
 
 
 def _message_events(m):
-    """Classify one agent message into the events we surface (a generator).
+    """Log one agent message AND yield any client events for it (a generator).
 
-    Single source of truth: the stream loop LOGS and YIELDS whatever this yields,
-    so the server logs and the client stream always agree. We switch on the
-    message class with isinstance (which also matches subclasses):
+    This is the single source of truth: logging and event-building live side by
+    side in each branch, so the server logs and the client stream can never drift.
+    We switch on the message class with isinstance (which also matches subclasses):
 
       - AIMessage with tool_calls -> one "tool_call" event per requested tool.
         (An AIMessage can be plain text OR carry tool requests, so the class check
         alone isn't enough — we also check tool_calls.)
       - ToolMessage             -> one "tool_message" event with the result.
-
-    Other messages (plain AI answer text, the user's turn, ...) produce nothing
-    here: the answer streams as "token" events, and the full reply is logged
-    separately at the end."""
+      - plain AIMessage         -> the final answer. No event here: it already
+        streams as "token" events and is logged as "FINAL reply". Stay quiet.
+      - anything else           -> unexpected. Log it (as a WARNING) but don't
+        invent an event — surfacing it beats silently dropping it."""
     if isinstance(m, AIMessage) and m.tool_calls:
         for call in m.tool_calls:
+            logger.info(f"  {type(m).__name__}: tool_call -> {call['name']}({call['args']})")
             yield {"type": "tool_call", "name": call["name"], "args": call["args"]}
     elif isinstance(m, ToolMessage):
-        yield {"type": "tool_message", "name": m.name, "content": _chunk_text(m)}
+        content = _chunk_text(m)
+        logger.info(f"  {type(m).__name__}: tool_message -> {m.name}: {content}")
+        yield {"type": "tool_message", "name": m.name, "content": content}
+    elif isinstance(m, AIMessage):
+        # Ignore - AIMessage is returned (with no m.tool_calls) when final LLM response is complete.
+        pass
+    else:
+        logger.warning(f"  unhandled LLM update {type(m).__name__}: {m}")

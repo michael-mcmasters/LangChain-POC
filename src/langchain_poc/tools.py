@@ -16,19 +16,19 @@ logger = logging.getLogger(__name__)
 def get_current_time() -> str:
     """Return the current date and time. Use this whenever the user asks what
     time or date it is, since you cannot know the current time on your own."""
-    logger.info("tool: get_current_time()")
+    logger.info("(Tool Log): get_current_time()")
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 @tool
 def add(a: float, b: float) -> float:
     """Add two numbers and return the result. Use this for any addition."""
-    logger.info(f"tool: add({a}, {b})")
+    logger.info(f"(Tool Log): add({a}, {b})")
     return a + b
 
 
 @tool
 def multiply(a: float, b: float) -> float:
     """Multiply two numbers and return the result. Use this for any multiplication."""
-    logger.info(f"tool: multiply({a}, {b})")
+    logger.info(f"(Tool Log): multiply({a}, {b})")
     return a * b
