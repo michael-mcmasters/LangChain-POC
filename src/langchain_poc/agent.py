@@ -67,16 +67,12 @@ async def stream_ask(message: str, thread_id: str):
             if text:
                 parts.append(text)
                 yield {"type": "token", "content": text}
+        
+        # The agent returns updates (see README for more on these)
         elif mode == "updates":
-            # A completed step (an AIMessage, ToolMessage, etc). Turn it into
-            # events, then LOG and YIELD the very same dict — so the server log and
-            # the client stream can never disagree about what happened.
-            # See README for more on these.
             for node_update in payload.values():
                 if isinstance(node_update, dict):
                     for m in node_update.get("messages", []):
-                        # _message_events both LOGS each message and YIELDS any
-                        # client events for it — one place, so they stay in sync.
                         for event in _message_events(m):
                             yield event
 
@@ -101,20 +97,14 @@ def _chunk_text(chunk) -> str:
 
 
 def _message_events(m):
-    """Log one agent message AND yield any client events for it (a generator).
-
-    This is the single source of truth: logging and event-building live side by
-    side in each branch, so the server logs and the client stream can never drift.
-    We switch on the message class with isinstance (which also matches subclasses):
-
-      - AIMessage with tool_calls -> one "tool_call" event per requested tool.
-        (An AIMessage can be plain text OR carry tool requests, so the class check
-        alone isn't enough — we also check tool_calls.)
-      - ToolMessage             -> one "tool_message" event with the result.
-      - plain AIMessage         -> the final answer. No event here: it already
-        streams as "token" events and is logged as "FINAL reply". Stay quiet.
-      - anything else           -> unexpected. Log it (as a WARNING) but don't
-        invent an event — surfacing it beats silently dropping it."""
+    """
+    Agent returns updates - Here we log them and return them as a type in the EventStream response
+    The client handles how/if it wants to deal with them
+    
+    For example, agent returns ToolMessage as an update.
+    This is the output of one of our tool functions.
+    Here we log it. And set it in EventStream as "tool_call" for the client to be aware of
+    """
     if isinstance(m, AIMessage) and m.tool_calls:
         for call in m.tool_calls:
             logger.info(f"  {type(m).__name__}: tool_call -> {call['name']}({call['args']})")

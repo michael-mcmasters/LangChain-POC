@@ -112,6 +112,6 @@ FastAPI and Uvicorn are both needed for API requests (unlike Spring Web or Expre
     @app.get("/")
     def read_root():
         return {"Hello": "World"}
-uv run uvicorn my_app.api:app --reload                  // Run project
 ```
+- uv run uvicorn my_app.api:app --reload                  // Run project
 - Go to http://localhost:8000/ to and you should see {"Hello":"World"}
