@@ -29,23 +29,6 @@ current date or time, use the get_current_time tool instead of guessing.""",
 )
 
 
-def ask(message: str) -> str:
-    """Run the agent on a message and return the final reply text."""
-    logger.info(f"USER asked: {message}")
-
-    result = agent.invoke({"messages": [("user", message)]})
-    logger.info(f"Raw Dump: {result}")
-
-    # Walk the whole conversation the agent produced and log each step so you can
-    # see the loop: user turn -> model asks for a tool -> tool result -> answer.
-    for m in result["messages"]:
-        _log_step(m)
-
-    reply = result["messages"][-1].content
-    logger.info(f"FINAL reply: {reply}")
-    return reply
-
-
 async def stream_ask(message: str):
     """Run the agent and yield the reply text token-by-token as it's produced.
 
