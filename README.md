@@ -7,7 +7,9 @@ A simple Python Langchain application to learn.
 - Switch to AWS Bedrock
 
 ### Run project
+```ps
 uv run uvicorn langchain_poc.api:app --reload
+```
 Go to http://localhost:8000/ to and you should see {"Hello":"World"}
 
 ### Invoke

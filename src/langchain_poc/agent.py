@@ -5,6 +5,7 @@ import logging
 from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
 # Importing config here guarantees load_dotenv() has run before we build the
@@ -22,15 +23,64 @@ model = ChatAnthropic(model=config.MODEL_NAME, max_tokens=1024)
 checkpointer = InMemorySaver()
 
 
-# Creates agent, tools it can use, and its system prtomp
-# Agent will go through tools to get a response before returning the result
+# --- Specialist agents ----------------------------------------------------
+# Each specialist is a FULL agent (its own ReAct loop) with a narrow job: its
+# own system prompt and its own subset of tools. This is the heart of Pattern 1
+# — instead of one agent holding every tool, we split the work across focused
+# agents. Note there's no checkpointer here, so a specialist starts fresh on
+# every call. Conversation memory lives on the orchestrator below, not here.
+
+math_agent = create_agent(
+    model,
+    tools=[add, multiply],
+    system_prompt="""You are a math specialist. Use the add and multiply tools to
+compute exact answers — don't do the arithmetic in your head. Show the steps briefly.""",
+)
+
+time_agent = create_agent(
+    model,
+    tools=[get_current_time],
+    system_prompt="""You are a timekeeping specialist. Use get_current_time to answer
+anything about the current date or time.""",
+)
+
+
+# --- Wrapper tools: let the orchestrator delegate to a specialist ----------
+# We wrap each specialist in an @tool. To the orchestrator these look like any
+# other tool (just as add/multiply did) — but calling one runs a whole agent.
+# The docstring is what the orchestrator reads to decide when to delegate.
+# Only the specialist's FINAL text comes back; its internal steps stay isolated.
+# These are async (ainvoke) so a specialist run doesn't block the event loop.
+
+@tool
+async def math_specialist(question: str) -> str:
+    """Delegate arithmetic — addition, multiplication, multi-step math — to the
+    math specialist. Pass the full math question as `question`."""
+    logger.info(f"  routing to math_specialist: {question}")
+    result = await math_agent.ainvoke({"messages": [("user", question)]})
+    return _last_text(result)
+
+
+@tool
+async def time_specialist(question: str) -> str:
+    """Delegate any question about the current date or time to the timekeeping
+    specialist. Pass the user's question as `question`."""
+    logger.info(f"  routing to time_specialist: {question}")
+    result = await time_agent.ainvoke({"messages": [("user", question)]})
+    return _last_text(result)
+
+
+# --- Orchestrator: the top-level agent stream_ask() drives -----------------
+# Holds NO domain tools of its own — only the two specialists. Its whole job is
+# to route each request to the right one (or answer directly for small talk).
+# This is the only agent with a checkpointer, so conversation memory lives here.
+
 agent = create_agent(
     model,
-    tools=[get_current_time, add, multiply],
-    # Not a bad idea to re-emphasize tools in the system prompt so the agent doesn't ignore them
-    system_prompt="""You are a helpful, friendly assistant. Keep your answers concise —
-one or two sentences unless the user asks for more detail. When the user asks about the
-current date or time, use the get_current_time tool instead of guessing.""",
+    tools=[math_specialist, time_specialist],
+    system_prompt="""You are an orchestrator. You do not do math or tell the time
+yourself. Delegate math questions to the math_specialist tool and date/time questions
+to the time_specialist tool. For anything else, answer directly and concisely.""",
     checkpointer=checkpointer,
 )
 
@@ -77,6 +127,15 @@ async def stream_ask(message: str, thread_id: str):
                             yield event
 
     logger.info(f"FINAL reply: {''.join(parts)}")
+
+
+def _last_text(state) -> str:
+    """Pull the final assistant text out of a specialist agent's result.
+
+    `.ainvoke()` returns the specialist's whole state dict; state["messages"][-1]
+    is its last message (the answer). We reuse _chunk_text to normalize it to a
+    plain string, the same way we do for streamed chunks."""
+    return _chunk_text(state["messages"][-1])
 
 
 def _chunk_text(chunk) -> str:
