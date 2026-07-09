@@ -91,6 +91,26 @@ Long-term, want to provision AWS Bedrock which also has Opus, along with cheaper
     PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is my name?"}'
     I don't have access to any personal information about you, so I don't know your name. You're welcome to tell me, and I'll use it in our conversation! 😊
     ```
+- Agent Orchestration options:
+  - agents-as-tools:
+    - You specify the agents and their tools (via Python functions and @tool annotation)
+    - Has its own context so parent agent's context doesn't get bloated - By default, this agent's context starts fresh next time it's called
+    - Parent agent only see this agent's response (similar to Tools returning a response) - Doesn't see its logic, context, anything
+      - This means you can't stream subagent responses to the user - If you want that, use supervisor graph (below)
+  - deepagents:
+    - Similar to agents-as-tools (above points are true for deepagents as well) - But abstracts some of the logic
+    - "Batteries included agents" - Meaning they have additional built-in tools such as write-todos to plan multiple steps, read_file, and write_file
+  - supervisor graph:
+    - Agents are peers, route around asupervisor, share context
+    - Benefit, you can stream all agent's responses to the user
+    - May be more effecient since they share context, but more expensive
+- Loops and Harnesses
+  - (Mostly buzzwords that blew up in 2026 for behaviours that LangGraph has provided for a while. "Loop Engineering" / "Harness Engineering" replacing "Prompt Engineering")
+  - Loop: Model -> tool call -> feed back to model -> tool call -> etc until done
+    - (All the logic occuring when my API is called is a loop)
+  - Harness: Everything around the agents - System prompt, tools, guardrails, etc
+    - (The Agent Orchestration options (above) are the harness)
+
 
 For Tools, the docstring inside the function is for the agent to know when to run them. It's not 100% for humans.
 
