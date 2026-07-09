@@ -57,8 +57,7 @@ async def math_specialist(question: str) -> str:
     """Delegate arithmetic — addition, multiplication, multi-step math — to the
     math specialist. Pass the full math question as `question`."""
     logger.info(f"  routing to math_specialist: {question}")
-    result = await math_agent.ainvoke({"messages": [("user", question)]})
-    return _last_text(result)
+    return await _run_specialist(math_agent, question)
 
 
 @tool
@@ -66,8 +65,7 @@ async def time_specialist(question: str) -> str:
     """Delegate any question about the current date or time to the timekeeping
     specialist. Pass the user's question as `question`."""
     logger.info(f"  routing to time_specialist: {question}")
-    result = await time_agent.ainvoke({"messages": [("user", question)]})
-    return _last_text(result)
+    return await _run_specialist(time_agent, question)
 
 
 # --- Orchestrator: the top-level agent stream_ask() drives -----------------
@@ -129,13 +127,28 @@ async def stream_ask(message: str, thread_id: str):
     logger.info(f"FINAL reply: {''.join(parts)}")
 
 
-def _last_text(state) -> str:
-    """Pull the final assistant text out of a specialist agent's result.
+async def _run_specialist(specialist, question: str) -> str:
+    """Run a specialist agent to completion, logging each internal update as it
+    happens, and return ONLY its final answer.
 
-    `.ainvoke()` returns the specialist's whole state dict; state["messages"][-1]
-    is its last message (the answer). We reuse _chunk_text to normalize it to a
-    plain string, the same way we do for streamed chunks."""
-    return _chunk_text(state["messages"][-1])
+    We stream the specialist's `updates` purely so we can log them (via
+    _log_message). Those logs go to stdout — they never cross back to the
+    orchestrator, which only ever sees this function's return value. So we get
+    full server-side visibility while the context stays isolated:
+    observe everything, return little."""
+    answer = ""
+    async for _mode, payload in specialist.astream(
+        {"messages": [("user", question)]},
+        stream_mode=["updates"],
+    ):
+        for node_update in payload.values():
+            if isinstance(node_update, dict):
+                for m in node_update.get("messages", []):
+                    _log_message(m)
+                    # The terminal AIMessage (no tool calls) is the final answer.
+                    if isinstance(m, AIMessage) and not m.tool_calls:
+                        answer = _chunk_text(m)
+    return answer
 
 
 def _chunk_text(chunk) -> str:
@@ -157,23 +170,38 @@ def _chunk_text(chunk) -> str:
 
 def _message_events(m):
     """
-    Agent returns updates - Here we log them and return them as a type in the EventStream response
-    The client handles how/if it wants to deal with them
-    
-    For example, agent returns ToolMessage as an update.
-    This is the output of one of our tool functions.
-    Here we log it. And set it in EventStream as "tool_call" for the client to be aware of
+    Log an agent update and, for the orchestrator, turn it into a typed event for
+    the EventStream response. The client decides how/if to use these events.
+
+    For example, the agent returns a ToolMessage as an update (the output of one
+    of our tool functions). We log it and emit it as "tool_message" so the client
+    is aware of it.
+
+    (The specialist wrappers reuse _log_message directly — they log their own
+    updates but do NOT emit client events.)
     """
+    _log_message(m)
+    if isinstance(m, AIMessage) and m.tool_calls:
+        for call in m.tool_calls:
+            yield {"type": "tool_call", "name": call["name"], "args": call["args"]}
+    elif isinstance(m, ToolMessage):
+        yield {"type": "tool_message", "name": m.name, "content": _chunk_text(m)}
+
+
+def _log_message(m) -> None:
+    """Log a single agent update (a tool call, a tool result, etc.).
+
+    Split out from _message_events so both callers can reuse it: the orchestrator
+    logs AND emits client events (above), while the specialist wrappers only want
+    the logging. Logging never touches the message state, so reusing it here has
+    no effect on context isolation."""
     if isinstance(m, AIMessage) and m.tool_calls:
         for call in m.tool_calls:
             logger.info(f"  {type(m).__name__}: tool_call -> {call['name']}({call['args']})")
-            yield {"type": "tool_call", "name": call["name"], "args": call["args"]}
     elif isinstance(m, ToolMessage):
-        content = _chunk_text(m)
-        logger.info(f"  {type(m).__name__}: tool_message -> {m.name}: {content}")
-        yield {"type": "tool_message", "name": m.name, "content": content}
+        logger.info(f"  {type(m).__name__}: tool_message -> {m.name}: {_chunk_text(m)}")
     elif isinstance(m, AIMessage):
-        # Ignore - AIMessage is returned (with no m.tool_calls) when final LLM response is complete.
+        # Final LLM response (no tool_calls) — nothing to log at the update level.
         pass
     else:
         logger.warning(f"  unhandled LLM update {type(m).__name__}: {m}")

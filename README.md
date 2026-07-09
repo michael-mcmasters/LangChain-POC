@@ -1,13 +1,19 @@
 ### About
 A simple Python Langchain application to learn.
 
-### TODO
-- Use multiple agents and an orchestrator
-- Agent Harness?
+### ToDo List
+- ~~Tools~~
+- ~~Memory~~
+- ~~Use Streams instead of POST~~
+- ~~Understand Loops~~
+- ~~Understand Agent Harness~~
+- ~~Use Multiple Agents - Agents-as-tools~~
+- Use Multiple Agents - Deepagents
+- Skills
 - Switch to AWS Bedrock
 
 ### Run project
-```ps
+```pwsh
 uv run uvicorn langchain_poc.api:app --reload
 ```
 Go to http://localhost:8000/ to and you should see {"Hello":"World"}
@@ -18,12 +24,12 @@ Things to know
 - thread_id is your conversation history. To "start a new chat" change it to another value.
 
 Get Time
-```ps
+```pwsh
 curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is the current time?", "thread_id": "ABC"}'
 ```
 
 Use Math (Notice the LLLM calls 2 tools - Multiply and then Add)
-```ps
+```pwsh
 curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC""}'
 ```
 
