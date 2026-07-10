@@ -8,6 +8,9 @@ A simple Python Langchain application to learn.
 - ~~Understand Loops~~
 - ~~Understand Agent Harness~~
 - ~~Use Multiple Agents - Agents-as-tools~~
+
+NEXT STEP: Put 'agents-as-tools' in one module ... Create 2nd module/api for deepagents
+
 - Use Multiple Agents - Deepagents
 - Skills
 - Switch to AWS Bedrock
@@ -25,21 +28,21 @@ Things to know
 
 Get Time
 ```pwsh
-curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is the current time?", "thread_id": "ABC"}'
+curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is the current time?", "thread_id": "ABC"}'
 ```
 
 Use Math (Notice the LLLM calls 2 tools - Multiply and then Add)
 ```pwsh
-curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC""}'
+curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC""}'
 ```
 
 ### Logs
 Making this request:
-  curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is the current time?"}'
+  curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is the current time?"}'
 
 Makes these logs appear:
 ```
-INFO:     127.0.0.1:49758 - "POST /chat/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49758 - "POST /chat/agent-as-tool HTTP/1.1" 200 OK
 16:17:26  INFO    langchain_poc.agent | USER asked (stream): What is 23 times 17, then add 100 to that?
 16:17:27  INFO    httpx | HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
 16:17:28  INFO    langchain_poc.agent |   AIMessage -> calling tool multiply({'a': 23, 'b': 17})
@@ -86,17 +89,17 @@ Long-term, want to provision AWS Bedrock which also has Opus, along with cheaper
   - In a real scenario, you should validate the thread_id so that bad actor can't mock it
   - Setting my name with thread_id ABC
     ```
-    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "My name is Michael. Please remember it.", "thread_id": "ABC"}'
+    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "My name is Michael. Please remember it.", "thread_id": "ABC"}'
     Got it, **Michael**! I'll remember your name throughout our conversation. How can I help you today?
     ```
   - Asking my name with thread_id ABC
     ```
-    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is my name?", "thread_id": "ABC"}'
+    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is my name?", "thread_id": "ABC"}'
     Your name is **Michael**! 😊 Is there anything else I can help you with?
     ```
   - Asking my name with no thread_id
     ```
-    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/stream" -H "Content-Type: application/json" -d '{"message": "What is my name?"}'
+    PS C:\Users\micha\dev\projects\2026\langchain-poc> curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is my name?"}'
     I don't have access to any personal information about you, so I don't know your name. You're welcome to tell me, and I'll use it in our conversation! 😊
     ```
 - Agent Orchestration options:

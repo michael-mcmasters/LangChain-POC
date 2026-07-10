@@ -1,11 +1,17 @@
-"""Controller - Uses FastAPI and Uvicorn (both are needed)"""
+"""Controller - Uses FastAPI and Uvicorn (both are needed).
+
+Two endpoints run the SAME task with two different multi-agent patterns so you
+can compare them:
+  - /chat/agent-as-tool -> langchain_poc.agent_as_tool (specialists wrapped as @tool)
+  - /chat/deepagents     -> langchain_poc.deepagents     (create_deep_agent + subagents)
+"""
 
 import json
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 
-from langchain_poc import agent
+from langchain_poc import agent_as_tool, deepagents
 from langchain_poc.schemas import ChatRequest
 
 app = FastAPI()
@@ -16,13 +22,24 @@ def hello_world():
     return {"Hello": "World"}
 
 
-@app.post("/chat/stream")
-async def chat_stream(req: ChatRequest):
-    # Wrapper that calls agent.stream_ask() and handles stream events
+@app.post("/chat/agent-as-tool")
+async def chat_agent_as_tool(req: ChatRequest):
+    return _stream(agent_as_tool.stream_ask(req.message, req.thread_id))
+
+
+@app.post("/chat/deepagents")
+async def chat_deepagents(req: ChatRequest):
+    return _stream(deepagents.stream_ask(req.message, req.thread_id))
+
+
+def _stream(events) -> StreamingResponse:
+    """Wrap an async event generator (from a package's stream_ask) as SSE.
+
+    Shared by both endpoints — the only thing that differs between them are events they produce"""
     async def event_stream():
-        async for event in agent.stream_ask(req.message, req.thread_id):
+        async for event in events:
             yield f"data: {json.dumps(event)}\n\n"
-        
+
         # Once stream is complete, set [DONE] so client knows
         yield "data: [DONE]\n\n"
 
