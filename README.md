@@ -1,5 +1,5 @@
 ### About
-A simple Python Langchain application to learn.
+A simple Python LangChain application to learn how to build AI agents. See below for notes on what I've learned.
 
 ### ToDo List
 - ~~Tools~~
@@ -10,7 +10,6 @@ A simple Python Langchain application to learn.
 - ~~Use Multiple Agents - Agents-as-tools~~
 - ~~Use Multiple Agents - Deepagents~~
 - ~~Skills~~
-- Switch to AWS Bedrock
 
 ### Run project
 ```pwsh
