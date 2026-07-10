@@ -1,14 +1,7 @@
-"""Pattern 1 — agents-as-tools: builds a tool-using orchestrator and exposes a
-function to call it.
-
-The orchestrator holds NO domain tools of its own. Instead each specialist is a
-FULL agent wrapped in an @tool. To the orchestrator these look like any other
-tool, but calling one runs a whole agent whose internal steps stay isolated —
-only its final answer comes back. Contrast this with the deepagents package,
-which gets the same delegation for free via its built-in `task` tool.
-"""
+"""Pattern 1 — agents-as-tools: builds a tool-using orchestrator and exposes a function to call it."""
 
 import logging
+from pathlib import Path
 
 from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
@@ -39,11 +32,25 @@ checkpointer = InMemorySaver()
 # agents. Note there's no checkpointer here, so a specialist starts fresh on
 # every call. Conversation memory lives on the orchestrator below, not here.
 
+# This pattern has no skills machinery, so we read the ascii-art skill off disk and
+# inline it into the prompt ourselves (deepagents loads it lazily via SkillsMiddleware).
+_ascii_skill = Path(__file__).resolve().parents[3] / "skills" / "ascii-art"
+_ascii_art = (
+    (_ascii_skill / "SKILL.md").read_text(encoding="utf-8")
+    + "\n\n"
+    + (_ascii_skill / "references" / "digits.txt").read_text(encoding="utf-8")
+)
+
 math_agent = create_agent(
     model,
     tools=[add, multiply],
     system_prompt="""You are a math specialist. Use the add and multiply tools to
-compute exact answers — don't do the arithmetic in your head. Show the steps briefly.""",
+compute exact answers — don't do the arithmetic in your head. Show the steps briefly.
+When you present your FINAL numeric answer, follow the ascii-art skill below to render
+that number as an ASCII-art banner.
+
+"""
+    + _ascii_art,
 )
 
 time_agent = create_agent(
@@ -93,10 +100,7 @@ to the time_specialist tool. For anything else, answer directly and concisely.""
 
 
 async def stream_ask(message: str, thread_id: str):
-    """Public entry point: stream this pattern's orchestrator as typed events.
-
-    The generic streaming lives in streaming.stream_agent — here we just point it
-    at THIS package's orchestrator so the API doesn't need to know the details."""
+    """Stream this pattern's orchestrator as typed events (see streaming.stream_agent)."""
     async for event in stream_agent(agent, message, thread_id):
         yield event
 

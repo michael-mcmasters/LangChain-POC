@@ -9,7 +9,7 @@ A simple Python Langchain application to learn.
 - ~~Understand Agent Harness~~
 - ~~Use Multiple Agents - Agents-as-tools~~
 - ~~Use Multiple Agents - Deepagents~~
-- Skills
+- ~~Skills~~
 - Switch to AWS Bedrock
 
 ### Run project
@@ -23,14 +23,19 @@ Things to know
 - Example commands are on Windows pwsh (not powershell) - If they don't work enter `pwsh` first to use Powershell 7+
 - thread_id is your conversation history. To "start a new chat" change it to another value.
 
-Get Time
+Agent-as-tool - Get Time
 ```pwsh
 curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is the current time?", "thread_id": "ABC"}'
 ```
 
-Use Math (Notice the LLLM calls 2 tools - Multiply and then Add)
+Agent-as-tool - Use Math & returns result as ascii-art using skill
 ```pwsh
 curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC"}'
+```
+
+Deepagents - Use Math & returns result as ascii-art using skill
+```pwsh
+curl.exe -N -X POST "http://localhost:8000/chat/deepagents" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC"}'
 ```
 
 ### Logs
@@ -155,6 +160,11 @@ orchestrator_agent = create_agent(
 
 
 ### How to use: deepagents
+First install them:
+```pwsh
+uv add deepagents
+```
+
 ```
 # Create math subagent
 math_subagent = {
@@ -176,7 +186,7 @@ orchestrator_agent = create_deep_agent(
 ```
 
 
-### Hot to create another Python / Langchain project like this
+### How to create another Python / Langchain project like this
 - Create new Python Project (with Langchain)
 - uv init --package my-app                                // Create
 - cd my-app                                               // CD

@@ -1,11 +1,4 @@
-"""Shared streaming helpers used by BOTH agent packages.
-
-Both orchestrators (agent-as-tool and deepagents) are LangGraph agents, so the
-code that runs them and turns their streamed output into typed events for the API
-is identical. It lives here so each package's agent.py only has to differ in HOW
-it builds the agent — not in how we stream it. That makes the two patterns easy
-to compare side by side.
-"""
+"""Shared streaming helpers used by both agent packages (both are LangGraph agents)."""
 
 import logging
 
