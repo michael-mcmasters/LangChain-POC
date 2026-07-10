@@ -8,10 +8,7 @@ A simple Python Langchain application to learn.
 - ~~Understand Loops~~
 - ~~Understand Agent Harness~~
 - ~~Use Multiple Agents - Agents-as-tools~~
-
-NEXT STEP: Put 'agents-as-tools' in one module ... Create 2nd module/api for deepagents
-
-- Use Multiple Agents - Deepagents
+- ~~Use Multiple Agents - Deepagents~~
 - Skills
 - Switch to AWS Bedrock
 
@@ -33,7 +30,7 @@ curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type:
 
 Use Math (Notice the LLLM calls 2 tools - Multiply and then Add)
 ```pwsh
-curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC""}'
+curl.exe -N -X POST "http://localhost:8000/chat/agent-as-tool" -H "Content-Type: application/json" -d '{"message": "What is 23 times 17, then add 100 to that?", "thread_id": "ABC"}'
 ```
 
 ### Logs
@@ -104,14 +101,17 @@ Long-term, want to provision AWS Bedrock which also has Opus, along with cheaper
     ```
 - Agent Orchestration options:
   - agents-as-tools:
+    - (See below for example code)
     - You specify the agents and their tools (via Python functions and @tool annotation)
     - Has its own context so parent agent's context doesn't get bloated - By default, this agent's context starts fresh next time it's called
     - Parent agent only see this agent's response (similar to Tools returning a response) - Doesn't see its logic, context, anything
       - This means you can't stream subagent responses to the user - If you want that, use supervisor graph (below)
   - deepagents:
+    - (See below for example code)
     - Similar to agents-as-tools (above points are true for deepagents as well) - But abstracts some of the logic
     - "Batteries included agents" - Meaning they have additional built-in tools such as write-todos to plan multiple steps, read_file, and write_file
   - supervisor graph:
+    - (No example code for this one)
     - Agents are peers, route around asupervisor, share context
     - Benefit, you can stream all agent's responses to the user
     - May be more effecient since they share context, but more expensive
@@ -126,6 +126,54 @@ Long-term, want to provision AWS Bedrock which also has Opus, along with cheaper
 For Tools, the docstring inside the function is for the agent to know when to run them. It's not 100% for humans.
 
 FastAPI and Uvicorn are both needed for API requests (unlike Spring Web or Express which contains all dependnecies)
+
+
+### How to use: agents-as-tools
+```
+# Create math agent
+math_agent = create_agent(
+    model,
+    tools=[add, multiply],
+    system_prompt="""You're an expert at math"""
+)
+
+# Expose math agent as a tool
+@tool
+async def math_specialist(question: str) -> str:
+    """Use this tool when you need a math agent"""      # docstring is not for us - Tells orchestrator when to use this tool
+    return await _run_specialist(math_agent, question)
+
+# Create orchestrator agent - Give it access to tool so it can delegate to math_agent
+orchestrator_agent = create_agent(
+    model,
+    tools=[math_specialist],
+    system_prompt="""You're an orchestrator. Answer simple questions or delegate to subagents if necessary""",
+)
+
+# Invoke orchestrator agent and it will do the rest: agent.astream( ... )
+```
+
+
+### How to use: deepagents
+```
+# Create math subagent
+math_subagent = {
+    "name": "math-agent",
+    "description": "Handles simple math equations",
+    "system_prompt": """You're an expert at math""",
+    "tools": [add, multiply],
+}
+
+# Create orchestrator agent - Give it access to math subagent
+orchestrator_agent = create_deep_agent(
+    model=model,
+    tools=[], # Good idea to give orchestrator agents no tools of their own - subagents handle which keeps context low (as it's orchestrator only sees their output)
+    system_prompt="""You're an orchestrator. Answer simple questions or delegate to subagents if necessary"""
+    subagents=[math_subagent],
+)
+
+# Invoke orchestrator agent and it will do the rest: agent.astream( ... )
+```
 
 
 ### Hot to create another Python / Langchain project like this
