@@ -1,4 +1,4 @@
-"""Pattern 2 — deepagents: same delegation behavior as agent-as-tool, built with create_deep_agent."""
+"""Declared agents and sub agents"""
 
 import logging
 from pathlib import Path
@@ -24,6 +24,7 @@ SKILLS_DIR = Path(__file__).resolve().parents[3] / "skills"
 backend = FilesystemBackend(root_dir=SKILLS_DIR, virtual_mode=True)
 READ_ONLY = [FilesystemPermission(operations=["write"], paths=["/**"], mode="deny")]
 
+# --- Define subagents ---
 math_subagent = {
     "name": "math-agent",
     "description": "Delegate arithmetic — addition, multiplication, multi-step math — here.",
@@ -43,6 +44,7 @@ anything about the current date or time.""",
     "tools": [get_current_time],
 }
 
+# --- Define orchestrator agent ---
 agent = create_deep_agent(
     model=model,
     tools=[],
@@ -60,7 +62,10 @@ planning that the agent-as-tool pattern does not have.""",
     checkpointer=checkpointer,
 )
 
-
+# --- Inits agent loop ---
 async def stream_ask(message: str, thread_id: str):
+    # stream_agent is a shared method called by this package and agent_as_tool package
+    # This package defines the agents and then calls stream_agent to initaite the agent loop
+    # The only difference between the two is how agents are defined.
     async for event in stream_agent(agent, message, thread_id):
         yield event

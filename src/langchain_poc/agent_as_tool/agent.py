@@ -1,7 +1,6 @@
 """Pattern 1 — agents-as-tools: builds a tool-using orchestrator and exposes a function to call it."""
 
 import logging
-from pathlib import Path
 
 from langchain.agents import create_agent
 from langchain_anthropic import ChatAnthropic
@@ -25,32 +24,12 @@ model = ChatAnthropic(model=config.MODEL_NAME, max_tokens=1024)
 checkpointer = InMemorySaver()
 
 
-# --- Specialist agents ----------------------------------------------------
-# Each specialist is a FULL agent (its own ReAct loop) with a narrow job: its
-# own system prompt and its own subset of tools. This is the heart of Pattern 1
-# — instead of one agent holding every tool, we split the work across focused
-# agents. Note there's no checkpointer here, so a specialist starts fresh on
-# every call. Conversation memory lives on the orchestrator below, not here.
-
-# This pattern has no skills machinery, so we read the ascii-art skill off disk and
-# inline it into the prompt ourselves (deepagents loads it lazily via SkillsMiddleware).
-_ascii_skill = Path(__file__).resolve().parents[3] / "skills" / "ascii-art"
-_ascii_art = (
-    (_ascii_skill / "SKILL.md").read_text(encoding="utf-8")
-    + "\n\n"
-    + (_ascii_skill / "references" / "digits.txt").read_text(encoding="utf-8")
-)
-
+# --- Define SubAgents ---
 math_agent = create_agent(
     model,
     tools=[add, multiply],
     system_prompt="""You are a math specialist. Use the add and multiply tools to
-compute exact answers — don't do the arithmetic in your head. Show the steps briefly.
-When you present your FINAL numeric answer, follow the ascii-art skill below to render
-that number as an ASCII-art banner.
-
-"""
-    + _ascii_art,
+compute exact answers — don't do the arithmetic in your head. Show the steps briefly.""",
 )
 
 time_agent = create_agent(
@@ -61,13 +40,7 @@ anything about the current date or time.""",
 )
 
 
-# --- Wrapper tools: let the orchestrator delegate to a specialist ----------
-# We wrap each specialist in an @tool. To the orchestrator these look like any
-# other tool (just as add/multiply did) — but calling one runs a whole agent.
-# The docstring is what the orchestrator reads to decide when to delegate.
-# Only the specialist's FINAL text comes back; its internal steps stay isolated.
-# These are async (ainvoke) so a specialist run doesn't block the event loop.
-
+# --- Define agents as tools so orchestrator agent can call them ---
 @tool
 async def math_specialist(question: str) -> str:
     """Delegate arithmetic — addition, multiplication, multi-step math — to the
@@ -84,11 +57,7 @@ async def time_specialist(question: str) -> str:
     return await _run_specialist(time_agent, question)
 
 
-# --- Orchestrator: the top-level agent stream_ask() drives -----------------
-# Holds NO domain tools of its own — only the two specialists. Its whole job is
-# to route each request to the right one (or answer directly for small talk).
-# This is the only agent with a checkpointer, so conversation memory lives here.
-
+# --- Define orchestrator agent, pass above specialist tools so orchetrator agent can call them
 agent = create_agent(
     model,
     tools=[math_specialist, time_specialist],
@@ -98,9 +67,12 @@ to the time_specialist tool. For anything else, answer directly and concisely.""
     checkpointer=checkpointer,
 )
 
-
+# --- Inits agent loop ---
 async def stream_ask(message: str, thread_id: str):
     """Stream this pattern's orchestrator as typed events (see streaming.stream_agent)."""
+    # stream_agent is a shared method called by this package and deepagents package
+    # This package defines the agents and then calls stream_agent to initaite the agent loop
+    # The only difference between the two is how agents are defined.
     async for event in stream_agent(agent, message, thread_id):
         yield event
 

@@ -111,10 +111,14 @@ Long-term, want to provision AWS Bedrock which also has Opus, along with cheaper
     - Has its own context so parent agent's context doesn't get bloated - By default, this agent's context starts fresh next time it's called
     - Parent agent only see this agent's response (similar to Tools returning a response) - Doesn't see its logic, context, anything
       - This means you can't stream subagent responses to the user - If you want that, use supervisor graph (below)
+    - Does not natively support skills (But you can force read the skill file and inject them into the system prompt to replicate it)
   - deepagents:
     - (See below for example code)
     - Similar to agents-as-tools (above points are true for deepagents as well) - But abstracts some of the logic
     - "Batteries included agents" - Meaning they have additional built-in tools such as write-todos to plan multiple steps, read_file, and write_file
+    - Much less verbose than agents-as-tools while providing the same (and more) behaviour
+    - Supports skills
+    - In my opinion, is the better option between the 2
   - supervisor graph:
     - (No example code for this one)
     - Agents are peers, route around asupervisor, share context

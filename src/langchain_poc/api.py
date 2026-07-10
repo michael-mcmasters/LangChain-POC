@@ -1,10 +1,4 @@
-"""Controller - Uses FastAPI and Uvicorn (both are needed).
-
-Two endpoints run the SAME task with two different multi-agent patterns so you
-can compare them:
-  - /chat/agent-as-tool -> langchain_poc.agent_as_tool (specialists wrapped as @tool)
-  - /chat/deepagents     -> langchain_poc.deepagents     (create_deep_agent + subagents)
-"""
+"""Controller - Uses FastAPI and Uvicorn (both are needed)."""
 
 import json
 
@@ -15,11 +9,6 @@ from langchain_poc import agent_as_tool, deepagents
 from langchain_poc.schemas import ChatRequest
 
 app = FastAPI()
-
-
-@app.get("/")
-def hello_world():
-    return {"Hello": "World"}
 
 
 @app.post("/chat/agent-as-tool")
